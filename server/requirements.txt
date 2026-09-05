@@ -1,0 +1,10 @@
+torch>=2.7
+torchvision>=0.22
+spandrel>=0.4
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+pyyaml>=6
+numpy>=1.26
+pillow>=10
+onnx>=1.16

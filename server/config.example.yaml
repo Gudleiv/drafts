@@ -1,0 +1,33 @@
+host: 127.0.0.1
+port: 8765
+
+models_dir: models
+onnx_dir: onnx
+engines_dir: engines
+
+device: cuda
+backend: torch          # torch | ort
+precision: fp16         # fp16 | bf16 | fp32
+tile: 1024
+overlap: 32
+batch: 4
+channels_last: true
+compile: false
+
+jpeg_quality: 92
+max_loaded_models: 3
+max_upload_mb: 64
+
+preload: []
+
+cors_origins:
+  - "*"
+
+ort_providers:
+  - NvTensorRTRTXExecutionProvider
+  - TensorrtExecutionProvider
+  - CUDAExecutionProvider
+ort_provider_options: {}
+ort_provider_library: ""
+
+log_level: info

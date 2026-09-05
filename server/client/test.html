@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Processing Test</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 20px; color: #222; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  label { display: flex; gap: 6px; align-items: center; }
+  #log { font-family: ui-monospace, monospace; white-space: pre-wrap; background: #f4f4f4; padding: 10px; min-height: 80px; }
+  .views { display: flex; gap: 12px; flex-wrap: wrap; }
+  .views > div { flex: 1 1 45%; min-width: 320px; }
+  canvas, img { max-width: 100%; height: auto; border: 1px solid #ccc; }
+</style>
+</head>
+<body>
+<div class="row">
+  <label>Server <input id="server" value="http://127.0.0.1:8765" size="28"></label>
+  <label>Model <select id="model"></select></label>
+  <label>Output
+    <select id="output">
+      <option value="rgba">rgba</option>
+      <option value="jpeg">jpeg</option>
+      <option value="png">png</option>
+    </select>
+  </label>
+  <label>Quality <input id="quality" type="number" value="92" min="1" max="100" style="width:60px"></label>
+  <button id="refresh">Refresh models</button>
+</div>
+<div class="row">
+  <input id="file" type="file" accept="image/jpeg,image/png">
+  <button id="run">Run</button>
+  <button id="load">Load + warm up</button>
+</div>
+<div id="log"></div>
+<div class="views">
+  <div><h4>Input</h4><img id="input"></div>
+  <div><h4>Output</h4><canvas id="canvas"></canvas></div>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const log = (msg) => { $("log").textContent += msg + "\n"; };
+
+async function refreshModels() {
+  const res = await fetch($("server").value + "/models");
+  const list = await res.json();
+  const sel = $("model");
+  sel.innerHTML = "";
+  for (const m of list) {
+    const opt = document.createElement("option");
+    opt.value = m.name;
+    opt.textContent = `${m.name} (${m.arch || "?"}, x${m.scale || "?"})${m.loaded ? " *" : ""}`;
+    sel.appendChild(opt);
+  }
+  log(`models: ${list.length}`);
+}
+
+async function loadModel() {
+  const name = encodeURIComponent($("model").value);
+  const t0 = performance.now();
+  const res = await fetch(`${$("server").value}/models/${name}/load`, { method: "POST" });
+  const body = await res.json();
+  log(`load ${res.status}: ${JSON.stringify(body)} in ${(performance.now() - t0).toFixed(0)} ms`);
+}
+
+async function run() {
+  const file = $("file").files[0];
+  if (!file) { log("select a file first"); return; }
+  $("input").src = URL.createObjectURL(file);
+  const output = $("output").value;
+  const url = `${$("server").value}/process?model=${encodeURIComponent($("model").value)}&output=${output}&quality=${$("quality").value}`;
+  const t0 = performance.now();
+  const res = await fetch(url, { method: "POST", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+  if (!res.ok) { log(`error ${res.status}: ${await res.text()}`); return; }
+  const buf = await res.arrayBuffer();
+  const t1 = performance.now();
+  const w = parseInt(res.headers.get("X-Width"), 10);
+  const h = parseInt(res.headers.get("X-Height"), 10);
+  const canvas = $("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (output === "rgba") {
+    const img = new ImageData(new Uint8ClampedArray(buf), w, h);
+    ctx.putImageData(img, 0, 0);
+  } else {
+    const bmp = await createImageBitmap(new Blob([buf], { type: res.headers.get("Content-Type") }));
+    ctx.drawImage(bmp, 0, 0);
+    bmp.close();
+  }
+  const t2 = performance.now();
+  log(`${output} ${w}x${h}, ${(buf.byteLength / 1e6).toFixed(1)} MB | server: ${res.headers.get("Server-Timing")} | fetch ${(t1 - t0).toFixed(0)} ms, draw ${(t2 - t1).toFixed(0)} ms, total ${(t2 - t0).toFixed(0)} ms`);
+}
+
+$("refresh").addEventListener("click", () => refreshModels().catch(e => log(String(e))));
+$("load").addEventListener("click", () => loadModel().catch(e => log(String(e))));
+$("run").addEventListener("click", () => run().catch(e => log(String(e))));
+refreshModels().catch(e => log(String(e)));
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+models/
+onnx/
+engines/
+out/
+config.yaml
+.venv/
+venv/
+__pycache__/
+*.pyc
