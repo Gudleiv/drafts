@@ -22,11 +22,17 @@ cd server
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install --upgrade pip
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu132
 pip install -r requirements.txt
 ```
 
-Use a CUDA 12.8 or newer wheel index (`cu128`, `cu129`, `cu130`); older builds do not support the newest GPU generations.
+Pick the wheel index that matches the CUDA runtime you want (`cu128`, `cu130`, `cu132`, ...); the newest index the driver supports is usually the best choice, and builds older than `cu128` do not cover the newest GPU generations. Verify the install:
+
+```powershell
+python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+```
+
+If the ONNX Runtime backend is used as well, install an `onnxruntime` package built against the same major CUDA version as the torch wheel, so that one process does not load two incompatible runtimes.
 
 Optional, for the ONNX Runtime backend (one of):
 
@@ -46,7 +52,9 @@ pip install spandrel_extra_arches
 ## Models
 
 Put model files into `models/` (subfolders are allowed; the subfolder becomes part of the model name).
-Only 3-channel RGB models are served.
+Accepted extensions: `.pth`, `.pt`, `.safetensors`, `.ckpt`. Only 3-channel RGB models are served.
+
+A `.safetensors` file stores tensors without architecture metadata, so spandrel infers the architecture from weight names and shapes. If a file cannot be identified, it still appears in `GET /models` with a non-empty `error` field; use the `.pth` release of the same model in that case.
 
 Suggested starting points from [OpenModelDB](https://openmodeldb.info/) (filter by architecture `Compact`, `SPAN`, `RealPLKSR` and by scale `1x` / `2x`):
 
